@@ -1,0 +1,26 @@
+This is all you need to create GuideXML documents
+from Sphinx documentation. 
+
+It was created for the Autodep project (GSoC 2011).
+Maybe it needs to handle more stuff, but it does
+everything I need right now.
+
+
+To use it. Three simple steps:
+1) Copy builders/guidexml.py to Sphinx's builders pkg.
+2) Copy writers/guidexml.py to Sphinx's writers pkg.
+3) Edit sphinx/builders/__init__.py and the following:
+
+BUILTIN_BUILDERS = {
+    ...
+    'guidexml':   ('guidexml', 'GuideXML'),
+    ...
+}
+
+That's it. Enjoy!
+
+
+Jesus (Neurogeek) Rivero
+neurogeek@gentoo.org
+
+
