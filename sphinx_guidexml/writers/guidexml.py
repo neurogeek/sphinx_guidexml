@@ -27,22 +27,22 @@ def replace_function(*args, **kwargs):
 
 
 GuideXmlReMapping = {
-    "paragraph" : (re.compile(r'(.{1,2})(paragraph)>\s'), 
+    "paragraph" : (re.compile(r'(<|<\/)(paragraph)>'), 
         replace_function("p>")),
     "image" : (re.compile(r'(.)(image)'), 
         replace_function("figure")),
-    "desc_addname" : (re.compile(r'(.{1,2}desc_addname>)\s'), ''),
-    "desc_name" : (re.compile(r'(.{1,2}desc_name>)\s'), ''),
-    "desc_parameter" : (re.compile(r'(.{1,2}desc_parameter>)\s'), ''),
-    "tgroup" : (re.compile(r'(.{1,2}tgroup.*>)\s'), ''),
-    "thead" : (re.compile(r'(.{1,2}thead.*>)\s'), ''),
-    "strong" : (re.compile(r'(.{1,2})(strong)>\s'), 
+    "desc_addname" : (re.compile(r'(.{1,2}desc_addname>)'), ''),
+    "desc_name" : (re.compile(r'(.{1,2}desc_name>)'), ''),
+    "desc_parameter" : (re.compile(r'(.{1,2}desc_parameter>)'), ''),
+    "tgroup" : (re.compile(r'(.{1,2}tgroup.*>)'), ''),
+    "thead" : (re.compile(r'(.{1,2}thead.*>)'), ''),
+    "strong" : (re.compile(r'(.{1,2})(strong)>'), 
         replace_function("b>")),
-    "emphasis" : (re.compile(r'(.{1,2})(emphasis)>\s'), 
+    "emphasis" : (re.compile(r'(.{1,2})(emphasis)>'), 
         replace_function("e>")),
-    "row" : (re.compile(r'(.{1,2})(row)>\s'), 
+    "row" : (re.compile(r'(.{1,2})(row)>'), 
         replace_function("tr>")),
-    "entry" : (re.compile(r'(.{1,2})(entry)>\s'), 
+    "entry" : (re.compile(r'(.{1,2})(entry)>'), 
         replace_function("ti>")),
 }
 
@@ -209,14 +209,13 @@ class GuideXmlTranslator(nodes.NodeVisitor):
             node.attributes['uri']
 
         rgx, repl = GuideXmlReMapping["image"]
-        figure = rgx.sub(repl, node.asdom().toprettyxml())
+        figure = rgx.sub(repl, node.asdom().toxml())
 
         self.section.append_block(figure)
 
     def visit_note(self, node):
-
         rgx, repl = GuideXmlReMapping["paragraph"]
-        note = rgx.sub(repl, node.asdom().toprettyxml())
+        note = rgx.sub(repl, node.asdom().toxml())
         self.section.append_block(note)
 
         raise nodes.SkipNode
@@ -226,7 +225,7 @@ class GuideXmlTranslator(nodes.NodeVisitor):
 
     def visit_Text(self, node):
 
-        text = node.asdom().toprettyxml()
+        text = node.asdom().toxml()
 
         if not self.section:
             raise nodes.SkipNode
@@ -238,51 +237,48 @@ class GuideXmlTranslator(nodes.NodeVisitor):
         self.section.append_block(text)
 
     def visit_desc(self, node):
-        if node.attributes['desctype'] == u'function':
-            self.block = [] 
+        desctype = node.attributes['desctype']
+
+        if desctype in (u"function", u"class"):
+            names = node.next_node().attributes['names'][0]
+            self.section.append_block("<pre caption='%s'>" % names)
         else:
-            raise nodes.SkipNode
+            self.section.append_block("<i>")
+
+    def visit_desc_signature(self, node):
+        pass
+
+    def visit_desc_addname(self, node):
+        self.section.append_block("<keyword>" + node.astext() + "</keyword>")
+        raise nodes.SkipNode
 
     def visit_desc_name(self, node):
-
-        p_node = node.parent.next_node()
-
-        rgx, repl = GuideXmlReMapping["desc_addname"]
-        pkg = rgx.sub(repl, p_node.asdom().toprettyxml())
-
-        rgx, repl = GuideXmlReMapping["desc_name"]
-        name = rgx.sub(repl, node.asdom().toprettyxml())
-
-
-        pkg, name = (pkg.strip(), name.strip())
-        self.block += ["<pre caption='", pkg, name, "'>", pkg, name]
+        self.section.append_block("<keyword>" + node.astext() + "</keyword>")
+        raise nodes.SkipNode
 
     def visit_desc_parameterlist(self, node):
-        self.block.append("(")
+        self.section.append_block("(")
 
     def visit_desc_parameter(self, node):
         rgx, repl = GuideXmlReMapping["desc_parameter"]
-        param = rgx.sub(repl, node.asdom().toprettyxml())
-
-        self.block.append(param.strip())
-        self.block.append(", ")
+        param = rgx.sub(repl, node.asdom().toxml())
+        self.section.append_block("<keyword>" + param.strip() + "</keyword>")
+        self.section.append_block(", ")
+        raise nodes.SkipNode
 
     def depart_desc_parameterlist(self, node):
-        self.block.pop()
-        self.block.append(")")
+        self.section.blocks.pop()  # Getting rid of the extra comma
+        self.section.append_block(")")
 
     def depart_desc(self, node):
-        self.block.append("</pre>")
-        self.section.append_block("".join(self.block))
-        self.block = None
+        desctype =  node.attributes['desctype']
+        if desctype in (u"function", u"class"):
+            self.section.append_block("</pre>")
+        else:
+            self.section.append_block("</i>")
 
     def visit_desc_content(self, node):
-        #TODO: CleanUp
-        self.block.append("<p>")
-        self.block.append(node.astext().replace("<", "&lt;").replace(">", "&gt;"))
-        self.block.append("</p>")
-
-        raise nodes.SkipNode
+        pass
 
     def visit_table(self, node):
         #TODO: CleanUp
